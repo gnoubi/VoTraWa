@@ -1,0 +1,25 @@
+####### DEBUT OPTIONS SGE #############
+### on choisit la file d'attente
+#$ -q all.q
+#$ -l h_rt=24:00:00
+### On demande 1 G par coeur
+#$ -l h_vmem=6G
+### On exporte les variables d'env
+#$ -V
+### On se place dans le repertoire de soumission
+#$ -cwd
+### Nom du job, visible dans qstat
+#$ -N Model_campagnol
+### Fichier où stocker la sortie
+#$ -o $JOB_NAME.$JOB_ID.out
+#$ -t 1-32
+###$ -pe openmp 2
+
+#$ -M patrick.giraudoux@univ-fcomte.fr
+#$ -m bea  ##notification : debut, arret, fin
+
+###### FIN OPTIONS SGE ##############
+## On charge Gama
+module load tools/gama/1.7
+## On lance Gama en mode batch
+gama-headless.sh -m 4000m ./input_${SGE_TASK_ID}.xml ../outs2/out${SGE_TASK_ID}
