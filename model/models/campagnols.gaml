@@ -362,7 +362,7 @@ grid mnt   file: space_grid_file schedules:[] {
 	}
 	
 }
-grid cells width:100 height:100 schedules:  simulated_plots
+grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 {
 	list<cells> my_far_cell<-[];
 	mnt my_mnt_cell;
