@@ -458,7 +458,6 @@ experiment campagnols type: gui {
 			species plots aspect:default;
 			grid cells;
 			species voles aspect:default;
-			species predating_deasese_factor aspect:base transparency:0.5;
 			species voles_start_point aspect:default;
 
 		}
