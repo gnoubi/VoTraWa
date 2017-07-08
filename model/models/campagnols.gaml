@@ -44,12 +44,8 @@ global {
 	
 	//int current_month <- 1 update: (time mod #year) div #month + 1;
 	
-	int nbPredator_per_agent <- 1;
 	float born_accumulator <- 0.0;
 	float death_accumulator <-0.0;
-	
-	float growth_rate <- 0.03;
-	float death_rate <- 0.01;
 	
 	float pop_total <- 1 update: (sum(cells collect(each.total_population)));
 	float pop_reproducer <- 0 update: sum(cells collect(each.reproducer_accumulator));
@@ -113,11 +109,6 @@ global {
 			write "younger" + younger_init;
 			write "grow " + reproducer_grow_rate;
 		}
-/*		create predating_deasese_factor number:1
-		{
-			location <- any_location_in(2#km around first(voles_start_point).location);
-		} 
- */	 
 		
 		ask voles_start_point
 		{			
@@ -162,33 +153,6 @@ global {
 	{
 		do halt;
 	}
-	reflex grow when:false //when:step>30
-	{
-		
-		list<cells> found_cells <-[];
-		ask  predating_deasese_factor 
-		{
-		//	found_cells <- found_cells accumulate self.interaction_zone;
-//			collect (each.intera)
-			
-		}
-		found_cells <- remove_duplicates(found_cells);
-		
-		//born_accumulator <- born_accumulator + growth_rate*population*individuals_at_distance;
-	
-		//float individuals_at_distance <- sum(interaction_zone collect(each.total_population));
-		//float new_population <- population + growth_rate*population*individuals_at_distance - population *death_rate  ;
-		
-		/*ask interaction_zone where(each.total_population !=0)
-		{
-			float pop_to_die <- total_population * myself.voles_death_rate * myself.population;
-			write "pop to die "+ pop_to_die;
-			do killed_voles(pop_to_die);
-		}*/
-	//	population <- new_population;
-	cycle <- int(5#month / step);
-		
-	}
 	
 	reflex new_year when:  dstart.month = current_date.month and dstart.day = current_date.day and current_date.year != dstart.year
 	{
@@ -199,76 +163,6 @@ global {
 	} 
 
 	
-}
-
-species predating_deasese_factor
-{
-	float growth_rate <- 0.03;
-	float death_rate <- 0.01;
-	
-	float population<- 5.0;
-	float voles_death_rate <- 0.00003;
-	
-	float juvenile_eat <- 0.6;
-	float reproducer_eat <- 0.35;
-	float younger_eat <- 0.5;
-	
-	geometry discovery_area <- nil; 
-	geometry hunting_area <- nil; 
-	
-	float baby_hunting_count <- 0.1;
-	float juvenile_hunting_count <- 0.7;
-	float reproducer_hunting_count <- 0.2; // par hectare par an;
-	float hunting_vole_count <- 531; // par hectare par an;
-	
-	
-	init
-	{
-		hunting_area<- circle(2#km);
-		discovery_area <- circle(6#km);
-	}
-	
-	reflex eat_vole 
-	{
-		list<cells> hunting_cell <- (simulated_plots overlapping hunting_area) sort (each.younger_accumulator * younger_eat+ each.juvenile_accumulator*juvenile_eat+ each.reproducer_accumulator*reproducer_eat);
-		
-		//list<cells> hunting_cell <- (simulated_plots overlapping hunting_area);
-		
-		float eatable_baby <- sum(hunting_cell collect(each.younger_accumulator));
-		float eatable_juvenile <- sum(hunting_cell collect(each.juvenile_accumulator));
-		float eatable_reproducer <- sum(hunting_cell collect(each.reproducer_accumulator));
-		
-		
-		ask  hunting_cell
-		{
-		//	eatable_baby
-		}
-		
-		ask cells  
-		{
-			float pop_to_die <- total_population * myself.voles_death_rate * myself.population;
-			do killed_voles(pop_to_die);
-		}
-//		population <- new_population;
-	}
-	
-/*	reflex move_to_barycenter
-	{
-		float individuals_at_distance <- sum(interaction_zone collect(each.total_population));
-		if(individuals_at_distance > 1)
-		{
-			float x <- sum(interaction_zone collect(each.total_population * each.location.x))  / individuals_at_distance ;
-			float y <- sum(interaction_zone collect(each.total_population * each.location.y) ) / individuals_at_distance ;
-			self.location <- point({x,y});
-		}
-		
-		
-	} */
-	
-	aspect base
-	{
-		draw shape color:#red;
-	}
 }
 
 
