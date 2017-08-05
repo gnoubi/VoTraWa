@@ -1,4 +1,4 @@
-﻿/**
+/**
  *  campagnols
  *  Author: nicolas
  *  Description: 
