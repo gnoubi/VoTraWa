@@ -31,7 +31,7 @@ global {
 	float juvenile_death_rate <- 0.01/#day;
 	float adult_death_rate <- 0.02/#day;
 	
-	float ld_dispersion_threshold <- 0.2;
+	float dispersion_threshold <- 0.2;
 	
 	float default_vole_carrying_capacity <- 500/(100#m*100#m);
 	
@@ -226,7 +226,7 @@ species voles //skills:[moving]
 		do die;
 	}
 	
-	reflex live when: my_current_cell!=nil and my_current_cell.carring_capacity!= 0 and my_current_cell.total_population/my_current_cell.carring_capacity<ld_dispersion_threshold
+	reflex live when: my_current_cell!=nil and my_current_cell.carring_capacity!= 0 and my_current_cell.total_population/my_current_cell.carring_capacity<dispersion_threshold
 	{
 		put my_current_cell.juvenile_day_acc at id + 1 at: id in: my_current_cell.juvenile_day_acc;  
 		do die;
@@ -375,10 +375,10 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 	}
 	
 	
-	reflex  initiate_move when:  (carring_capacity != 0 and total_population/carring_capacity>ld_dispersion_threshold)
+	reflex  initiate_move when:  (carring_capacity != 0 and total_population/carring_capacity>dispersion_threshold)
 	{
 			
-		int number_individual_move <-round(total_population-(carring_capacity*ld_dispersion_threshold));
+		int number_individual_move <-round(total_population-(carring_capacity*dispersion_threshold));
 		 number_individual_move <- juvenile_accumulator < number_individual_move ? int(juvenile_accumulator):number_individual_move; 
 		//float nb_juvenile_accumulator <- 10;//juvenile_accumulator - number_individual_move;
 		
@@ -423,7 +423,7 @@ experiment campagnols type: gui {
 	parameter "younger_death_rate" var:younger_death_rate <- 0.003/#day;
 	parameter "juvenile_death_rate" var:juvenile_death_rate<-0.003/#day;
 	parameter "adult_death_rate" var:adult_death_rate<- 0.003/#day;
-	parameter "long_distance_dispersion_threshold" var:ld_dispersion_threshold<- 0.2;
+	parameter "dispersion_threshold" var:dispersion_threshold<- 0.2;
 	parameter "default_vole_carring_capacity" var:default_vole_carrying_capacity<- 500/(100#m*100#m);
 	parameter "crazy_vole_rate" var:crazy_vole_rate <- 0.1;
 	parameter "open_season" var:open_season <- 4;
