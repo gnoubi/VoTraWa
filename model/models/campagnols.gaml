@@ -20,6 +20,7 @@ global {
 	list<cells> simulated_plots <- [];
 	
 	
+	int simnum<-0;
 	// nombre d'adulte / nb juvénile
 	
 	float younger_compartment_max_age <- 18#day ;
@@ -161,7 +162,11 @@ global {
 		discovered_area_year <- discovered_cell - discovered_area;
 		discovered_area <- discovered_cell;
 	} 
-
+	
+	reflex newsemester when: current_date.day=1 and (  current_date.month = 6 or current_date.month = 12)
+	{
+	save simulated_plots with:[younger_accumulator::"younger",juvenile_accumulator::"juvenile",adult_accumulator::"adult"] to:"outs/campagnols_"+simnum+"_"+cycle+".shp" type:"shp";
+	} 
 	
 }
 
@@ -417,6 +422,7 @@ species plots
 
 experiment campagnols type: gui {
 	/** Insert here the definition of the input and output of the model */
+	parameter "simnum" var: simnum <- 0 ;
 	parameter "younger_compartment_change_rate" var: younger_compartment_max_age <- 18#day ;
 	parameter "juvenile_compartment_change_rate" var:juvenile_compartment_max_age<- (8*7)#day ;
 	parameter "adult_grow_rate" var:adult_grow_rate <- 0.0165/#day;
