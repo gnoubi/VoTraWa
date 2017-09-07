@@ -167,7 +167,7 @@ global {
 	reflex newsemester when: current_date.day=1 and (  current_date.month = 6 or current_date.month = 12)
 	{
 	save simulated_plots with:[younger_accumulator::"younger",juvenile_accumulator::"juvenile",adult_accumulator::"adult"] to:"outs/cells_"+simnum+"_"+cycle+".shp" type:"shp";
-	save voles to:"outs/voles_"+simnum+"_"+cycle+".shp" type:"shp";
+	if(length(voles)>0) {save voles to:"outs/voles_"+simnum+"_"+cycle+".shp" type:"shp";}
 	} 
 	
 }
