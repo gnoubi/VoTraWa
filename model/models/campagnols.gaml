@@ -7,13 +7,15 @@
 model campagnols
 
 global {
-	file space_grid_file <- file("../includes/DEM_Romanche_LIIres50.asc");
+	// Space projection (boundaries of the space)
 	file emprise <- file("../includes/emprise1.shp");
+	// Elevation model of the space
+	file space_grid_file <- file("../includes/DEM_Romanche_LIIres50.asc");
+	//  studied space
 	file plot_shape <- file("../includes/Mailles_2014_reduit.shp");
-	
+	// Source place of vol colonisation
 	file starting_shape <- file("../includes/historique_1998.shp");
-	
-	//file starting_shape <- file("../includes/startingPoint_proj.shp");
+	// predefined landuse color
 	map colors <- map([1::rgb([178, 180, 176]), 2::rgb([246, 111, 0]), 3::rgb([107, 0, 0]), 4::rgb([249, 0, 255]), 5::rgb([144, 96, 22]), 6::rgb([255, 255, 86]), 7::rgb([19, 114, 38]), 8::rgb("black"), 9::rgb([107, 94, 255]), 10::rgb([43, 255, 255])]);
 	
 	geometry shape <- envelope(emprise);
@@ -21,30 +23,42 @@ global {
 	
 	
 	int simnum<-0;
-	// nombre d'adulte / nb juvénile
 	
+	// maximum age of a younger vol
 	float younger_compartment_max_age <- 18#day ;
+	// maximum age of a juvenile vol
 	float juvenile_compartment_max_age <- (8*7)#day ;
+	//grow rate of younger vol from adult and juvenile vol. (individual/date/individual)
+	float adult_grow_rate <- 0.0165/#day; 
 	
-	float adult_grow_rate <- 0.0165/#day; //0.38/#day;
-	
+	/**
+	 * Death rates.
+	 */
+	//Death rate of younger vol.  (individual/date/individual)
 	float younger_death_rate <- 0.01/#day;
+	//Death rate of juvenile vol.  (individual/date/individual)
 	float juvenile_death_rate <- 0.01/#day;
+	//Death rate of adult vol.  (individual/date/individual)
 	float adult_death_rate <- 0.02/#day;
-	
+	//vol density saturation threshold
 	float dispersion_threshold <- 0.2;
 	
+	//Structural capacity of the space in indiividuals / Ha
 	float default_vole_carrying_capacity <- 500/(100#m*100#m);
-	
+
+	//rate for selecting vol behavior (short range motion vs long range motion)
 	float crazy_vole_rate <- 0.1;
+	//Long range moving distance : minima and maxima
 	float min_distance_crazy_vole <- 3#km;
 	float max_distance_crazy_vole <- 6#km;
 	
+	//reproducing seasong (from the begining of april to the end of october)
 	int open_season <- 4;
 	int close_season <- 10;
 	
-	//int current_month <- 1 update: (time mod #year) div #month + 1;
-	
+	/**
+	 * internal variable of the model
+	 */
 	float born_accumulator <- 0.0;
 	float death_accumulator <-0.0;
 	
@@ -67,26 +81,18 @@ global {
 	int long_distance_dispersing_voles <- 0 update:(voles count(each.crazy_voles));
 	int short_distance_dispersing_voles <- 0 update:(voles count(!each.crazy_voles));
 	int dispersing_voles -> {short_distance_dispersing_voles + long_distance_dispersing_voles };
-
-	
-//	float min_cell_younger_monitor <- 0 update:cells count(each.younger_accumulator !=0 and each.younger_accumulator = min([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
-//	float min_cell_juvenile_monitor <- 0 update:cells count(each.juvenile_accumulator !=0 and each.juvenile_accumulator = min([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
-//	float min_cell_adult_monitor <- 0 update:cells count(each.adult_accumulator !=0 and each.adult_accumulator = min([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
-//	float max_cell_younger_monitor <-0 update:cells count(each.younger_accumulator !=0 and each.younger_accumulator = max([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
-//	float max_cell_juvenile_monitor<- 0 update:cells count(each.juvenile_accumulator !=0 and each.juvenile_accumulator = max([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
-//	float max_cell_adult_monitor<- 0 update:cells count(each.adult_accumulator !=0 and each.adult_accumulator = max([each.younger_accumulator,each.juvenile_accumulator,each.adult_accumulator]));
 	
 	float coeff_go_down <- 2/3;
-	//date starting_date <- date(5#month);
 	
 	date dstart <- date([1998, 4,1,0,0,0]);
 	
 	init
 	{
-		//shape <- envelope(plot_shape);
 		step <- 1#day;
 		starting_date <- dstart;
-		//save world to:"../includes/projection.shp" type:"shp";
+		/**
+		 * Creation of the space
+		 */
 		create plots from:plot_shape;
 		loop pp over:plots
 		{
@@ -98,9 +104,10 @@ global {
 		}
 		simulated_plots <- cells where(each.carring_capacity != 0);
 		
-		
-		point orig <- point({908115.991,2017912.707});
-		create voles_start_point from: starting_shape //with:[younger_init::int(read("younger")),juvenile_init::int(read("juvenile")),adult_init::int(read("adult"))]
+		/**
+		 * creation of vol pululation starting point
+		 */
+		create voles_start_point from: starting_shape 
 		{
 			adult_init <- 100;
 			younger_init <- 0;
@@ -115,46 +122,44 @@ global {
 		{			
 			ask cells overlapping(self)
 			{
-				//adult_accumulator <- 30.0;
 				color <- #red; 
 				adult_accumulator <- float(myself.adult_init);
 				int i <- 0;
 				young_born_day_acc<- [];				
 			}
-			
-			//write "coucou" + younger_born_day at "cdsf";
-			
 		}
-		
-		ask mnt
+
+		/**
+		 *  initialise the elevation model
+		 */
+ 		ask mnt
 		{
 				associated_cell <- one_of(cells overlapping self);
 				associated_cell.my_mnt_cell <- self;
-				//neighbours_mnt_cell <- (self neighbours_at 1 ) where(each.height <=self.height );
-				
 				neighbours_mnt_cell <- (self neighbours_at 1 ) ;
 				int down <- neighbours_mnt_cell count(each.height <=self.height);
 				sum_weight <- coeff_go_down * down + (1-coeff_go_down) * (length(neighbours_mnt_cell) - down);
-				
-				
-				//list <mnt> places <- (self neighbours_at 1 ) where(each.height <=self.height )
-				
 		}
 		
 		ask simulated_plots
 		{
 			my_far_cell <- simulated_plots overlapping (max_distance_crazy_vole around circle(min_distance_crazy_vole));
-			
 		}
 		
 		
 	}
 	
+	/**
+	 * stop simulation when all vols are destroyed
+	 */
 	reflex no_vol when: false and population_young_monitor + population_juvenile_monitor + population_adult_monitor <= 0
 	{
 		do halt;
 	}
 	
+	/**
+	 * action to do at the begining of a year
+	 */
 	reflex new_year when:  dstart.month = current_date.month and dstart.day = current_date.day and current_date.year != dstart.year
 	{
 		float area_cell <- one_of(cells).shape.area;
@@ -163,8 +168,10 @@ global {
 		discovered_area <- discovered_cell;
 	} 
 	
-	
-	reflex newsemester when: current_date.day=1 and (  current_date.month = 6 or current_date.month = 12)
+	/**
+	 * action to do at the begining of a semester
+	 */
+	reflex newsemester when: current_date.day=1 and ( current_date.month = 6 or current_date.month = 12)
 	{
 	save simulated_plots with:[younger_accumulator::"younger",juvenile_accumulator::"juvenile",adult_accumulator::"adult"] to:"outs/cells_"+simnum+"_"+cycle+".shp" type:"shp";
 	if(length(voles)>0) {save voles to:"outs/voles_"+simnum+"_"+cycle+".shp" type:"shp";}
@@ -172,7 +179,9 @@ global {
 	
 }
 
-
+/**
+ * specie to define vol pululation starting point
+ */
 species voles_start_point
 {
 	int younger_init <- 0;
@@ -184,7 +193,8 @@ species voles_start_point
 	}
 }
 
-species voles //skills:[moving]
+
+species voles 
 {
 	float age <- 0.0;
 	int id <- 0;
@@ -222,7 +232,6 @@ species voles //skills:[moving]
 				res <- lc_place;
 				break;
 			}	
-			
 		}
 		return res;
 	}
@@ -263,6 +272,7 @@ grid mnt   file: space_grid_file schedules:[] {
 	}
 	
 }
+
 grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 {
 	list<cells> my_far_cell<-[];
