@@ -1,5 +1,5 @@
 /**
- *  campagnols
+ *  Voles model
  *  Author: nicolas
  *  Description: 
  */
@@ -25,9 +25,9 @@ global {
 	int simnum<-0;
 	
 	// maximum age of a younger vol
-	float younger_compartment_max_age <- 18#day ;
+	int younger_compartment_max_age <- int(18#day) ;
 	// maximum age of a juvenile vol
-	float juvenile_compartment_max_age <- (8*7)#day ;
+	int juvenile_compartment_max_age <- int((8*7)#day) ;
 	//grow rate of younger vol from adult and juvenile vol. (individual/date/individual)
 	float adult_grow_rate <- 0.0165/#day; 
 	
@@ -51,27 +51,34 @@ global {
 	//Long range moving distance : minima and maxima
 	float min_distance_crazy_vole <- 3#km;
 	float max_distance_crazy_vole <- 6#km;
+	// moving  behaviour probability (probability of moving to an equal or lower elevation)  	
+	float coeff_go_down <- 2/3;
 	
-	//reproducing seasong (from the begining of april to the end of october)
+	//reproducing season (from the begining of april to the end of october)
 	int open_season <- 4;
 	int close_season <- 10;
 	
 	/**
-	 * internal variable of the model
+	 * starting date of the simulation
+	 */
+	date dstart <- date([1998, 4,1,0,0,0]);
+	
+	/**
+	 * internal variables of the model 
 	 */
 	float born_accumulator <- 0.0;
 	float death_accumulator <-0.0;
 	
+	/**
+	 * variables containing outputs of the model
+	 */
 	float pop_total <- 1 update: (sum(cells collect(each.total_population)));
 	float pop_adult <- 0 update: sum(cells collect(each.adult_accumulator));
 	float pop_juvenile <- 0 update: sum(cells collect(each.juvenile_accumulator));
 	float pop_younger <- 0 update:sum(cells collect(each.younger_accumulator));
 	float colonisation_speed <- 0.0;
-	
 	float discovered_area <- 0;
 	float discovered_area_year <- 0;
-	
-	
 	float densite_monitor <- 0 update:mean(cells collect(((each.total_population/each.shape.area)/default_vole_carrying_capacity)*100));
 	float densite_occuped_monitor <- 0 update:mean(cells where(each.is_occupated) collect(((each.total_population/each.shape.area)/default_vole_carrying_capacity)*100));
 	float population_young_monitor <- 0 update:sum(cells collect(each.younger_accumulator));
@@ -82,12 +89,10 @@ global {
 	int short_distance_dispersing_voles <- 0 update:(voles count(!each.crazy_voles));
 	int dispersing_voles -> {short_distance_dispersing_voles + long_distance_dispersing_voles };
 	
-	float coeff_go_down <- 2/3;
-	
-	date dstart <- date([1998, 4,1,0,0,0]);
 	
 	init
 	{
+		// one simulation step correspond to one day in the real life
 		step <- 1#day;
 		starting_date <- dstart;
 		/**
@@ -105,7 +110,7 @@ global {
 		simulated_plots <- cells where(each.carring_capacity != 0);
 		
 		/**
-		 * creation of vol pululation starting point
+		 * creation of vole population outbreak starting point
 		 */
 		create voles_start_point from: starting_shape 
 		{
@@ -193,32 +198,37 @@ species voles_start_point
 	}
 }
 
-
+/**
+ * Vole species, it contains agent characteristics and agent behaviour (move, die)
+ */
 species voles 
 {
-	float age <- 0.0;
-	int id <- 0;
+	//age of the juvenile agent
+	int juvenile_age_id <- 0;
+	//does the voles follow long distance behaviour or short distance distance behaviour
 	bool crazy_voles<-true;
+	//
 	mnt current_place <- nil;
-	
 	cells my_current_cell;
 	
-	
+	//long distance moving behaviour
 	reflex gogo_crazy when: crazy_voles
 	{
 		my_current_cell <- one_of(my_current_cell.my_far_cell); //one_of(simulated_plots overlapping (6#km around circle(3#km)));
 		location <- my_current_cell.location;
 	}
-	reflex gogo when: !crazy_voles // and false
+	
+	//short distance moving behaviour
+	reflex gogo when: !crazy_voles
 	{
 		//list<mnt> places <- current_place.neighbours_mnt_cell; //neighbours_at 1 where(each.height <=current_place.height);
 		mnt plc <- choose_cell(current_place,rnd(1000)/1000,coeff_go_down,current_place.sum_weight);    //length(places)>0?one_of(places):current_place;
 		current_place <- plc;
 		location <- current_place.location;
 		my_current_cell <- current_place.associated_cell;// one_of(cells overlapping current_place);
-		
 	}
 	
+	//determine the next cell to move according to the current spatial situation
 	mnt choose_cell(mnt mplace, float rndVal, float coeff_down, float maxVal)
 	{
 		list<mnt> places <- mplace.neighbours_mnt_cell;//(self neighbours_at 1 ); //where(each.height <=self.height )
@@ -236,60 +246,65 @@ species voles
 		return res;
 	}
 	
-
+	// vulnaribility to die on the way to the next cell (predation, ...)
 	reflex killed when:flip(0.5)
 	{
 		do die;
 	}
 	
-	reflex live when: my_current_cell!=nil and my_current_cell.carring_capacity!= 0 and my_current_cell.total_population/my_current_cell.carring_capacity<dispersion_threshold
+	// The vole find a place to settle down, it is integrated into age category
+	reflex individual_to_population when: my_current_cell!=nil and my_current_cell.carring_capacity!= 0 and my_current_cell.total_population/my_current_cell.carring_capacity<dispersion_threshold
 	{
-		put my_current_cell.juvenile_day_acc at id + 1 at: id in: my_current_cell.juvenile_day_acc;  
+		put my_current_cell.juvenile_day_acc at juvenile_age_id + 1 at: juvenile_age_id in: my_current_cell.juvenile_day_acc;  
 		do die;
 	}
 	
+	// Just for display 
 	aspect default
 	{
 		draw circle(20#m) color:#blue;
 	}
 }
 
-species voles_day_pop
-{
-	int creation_step;
-	int population;
-}
-
+/**
+ * DEM grid 
+ */
 grid mnt   file: space_grid_file schedules:[] {
 	float height <- grid_value;
 	cells associated_cell <- nil;
-	
 	list< mnt> neighbours_mnt_cell  <- nil;
-	float sum_weight <- 0.0;
-	init {
-		//write grid_value;
-		//color <- colors at int(grid_value);
-	}
-	
+	float sum_weight <- 0.0;	
 }
 
+/**
+ * population grid, each cell is an agent (cell agent) that control local population
+ */
 grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 {
+	// local carring capacity
+	float carring_capacity <- 0.0;
+
 	list<cells> my_far_cell<-[];
 	mnt my_mnt_cell;
+	//daily accumulator by actual age
 	list<float> young_born_day_acc <-[];
 	list<float> juvenile_day_acc <-[];
+
+	//daily accumulator by age class
 	float younger_accumulator -> {sum(young_born_day_acc)};
 	float juvenile_accumulator -> {sum(juvenile_day_acc)};
 	float adult_accumulator <- 0.0;
+
+	//cell monitors
 	float total_population -> {sum(young_born_day_acc) + sum(juvenile_day_acc) +adult_accumulator };
 	float adult_rate -> {adult_accumulator = 0? 0:adult_accumulator / total_population};
-	float carring_capacity <- 0.0;
-	//rgb color <- #white update: carring_capacity=0?#white:(total_population=0?#green:rgb(255,0,40));
+
 	rgb color <- #white update: carring_capacity=0?#white:(total_population!=0?#red:#green);
 	bool is_occupated -> {total_population>0};
 	
-
+	/**
+	 * for the display
+	 */
 	aspect grille
 	{
 		if(carring_capacity != 0)
@@ -298,8 +313,9 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 		}
 	}
 	
-	
-	
+	/**
+	 * FIFO accumulator managment - get the older out
+	 */
 	float pull_data(list<float> mList,int da)
 	{
 		float data <- 0.0;
@@ -311,95 +327,54 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 		return data;
 	}
 	
-	list<float>  killed_voles_rated(float adult, float juvenile, float younger)
-	{
-		list<float> result <- [0.0,0.0,0.0];
-		float juv <- juvenile_accumulator;
-		if(juv < juvenile)
-		{
-			juvenile <- juvenile - juv;
-			juvenile_day_acc<- [];
-			result[0]<- juvenile;
-		}
-		else
-		{
-			juvenile_day_acc <- juvenile_day_acc accumulate (each - juvenile)	;			
-		}
-		float you <- younger_accumulator;
-		if(you < younger)
-		{
-			younger <- younger - you;
-			young_born_day_acc<- [];
-			result[1]<- younger;
-		}
-		else
-		{
-			young_born_day_acc <- young_born_day_acc accumulate (each - younger)	;			
-		}
-		
-		if(adult_accumulator < adult)
-		{
-			adult <- adult - adult_accumulator;
-			adult_accumulator <- 0.0;
-			result[2]<-adult;
-		}
-		else
-		{
-			adult_accumulator <- adult_accumulator - adult;			
-		}
-		return result;
-	}
-	
-	action killed_voles(float nbInd)
-	{
-		float totPop <- total_population;
-		
-		float xx <- nbInd / totPop;
-		juvenile_day_acc <- juvenile_day_acc accumulate (each - each * xx)	;
-		young_born_day_acc <- young_born_day_acc accumulate (each - each * xx)	;
-		adult_accumulator <- adult_accumulator - adult_accumulator*xx;
-		
-	}
-	
+
+	/**
+	 * population management
+	 */
 	reflex transfertPopulations
 	{
+		//Retrieve population that must be transfered to the upper age category
 		float new_juvenile <- pull_data(young_born_day_acc,younger_compartment_max_age);
 		float new_adult <- pull_data(juvenile_day_acc,juvenile_compartment_max_age);
-		
-		//write 'test juv ' + new_juvenile + " " + new_adult + " "+ current_month;
-		
+
+		//Population transfert to the upper age category
 		juvenile_day_acc <- juvenile_day_acc + new_juvenile;
 		adult_accumulator <- adult_accumulator + new_adult;
+		
+		//Population growth
 		float temp_repo <- current_date.month>= open_season and current_date.month<= close_season?  adult_grow_rate:0;
 		float juvenile_sum <- sum(juvenile_day_acc);
-		
+			
 		float next_step_younger_accumulator <- temp_repo*step * (adult_accumulator + juvenile_sum) *(1-total_population/carring_capacity);
 		if (adult_accumulator !=0)
 		{
-					young_born_day_acc <- young_born_day_acc + next_step_younger_accumulator;
+			young_born_day_acc <- young_born_day_acc + next_step_younger_accumulator;
 						
 		}
+		
+		/**
+		 * Substract adult, juvenile and younger dead voles from the population
+		 */		
 		float young_sum <- sum(young_born_day_acc);
 		float to_young_death <- young_sum=0?0:young_sum*younger_death_rate*step/length(young_born_day_acc);
 		float to_juvenile_death <-juvenile_sum=0?0: juvenile_sum*juvenile_death_rate*step/length(juvenile_day_acc);
-		
-		//juvenile_day_acc <- juvenile_day_acc accumulate (each<to_juvenile_death?0: each - to_juvenile_death); 
 		juvenile_day_acc <- juvenile_day_acc collect (each<to_juvenile_death?0: each - to_juvenile_death);
-		//young_born_day_acc <- young_born_day_acc accumulate (each<to_young_death?0: each - to_young_death); 
 		young_born_day_acc <- young_born_day_acc collect (each<to_young_death?0:each - to_young_death);
 		adult_accumulator <- adult_accumulator -  adult_accumulator*adult_death_rate*step;
-		
 	}
 	
-	
-	reflex  initiate_move when:  (carring_capacity != 0 and total_population/carring_capacity>dispersion_threshold)
+	/**
+	 *	Create vole agent to initiate vole spatial spread  
+	 */	
+	reflex  initiate_vole_move when:  (carring_capacity != 0 and total_population/carring_capacity>dispersion_threshold)
 	{
-			
+		//determine the number of agent to create
 		int number_individual_move <-round(total_population-(carring_capacity*dispersion_threshold));
-		 number_individual_move <- juvenile_accumulator < number_individual_move ? int(juvenile_accumulator):number_individual_move; 
-		//float nb_juvenile_accumulator <- 10;//juvenile_accumulator - number_individual_move;
-		
+		number_individual_move <- juvenile_accumulator < number_individual_move ? int(juvenile_accumulator):number_individual_move; 
+	
 		float len <- juvenile_accumulator;
+		
+		//create vole agent.
 		if(number_individual_move > 0)
 		{
 			juvenile_day_acc <- juvenile_day_acc collect (each - number_individual_move * each/len );
@@ -407,11 +382,13 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 		
 			create voles number:number_individual_move
 			{
-				
-				id <- rnd(length(myself.juvenile_day_acc)-1);
+				// select one vole in the juvenile age list
+				juvenile_age_id <- rnd(length(myself.juvenile_day_acc)-1);
+				// locate the agent at the current cell
 				location <- loc;
 				my_current_cell <- myself;
-				current_place <- my_current_cell.my_mnt_cell; //one_of(mnt where(each.associated_cell=my_current_cell) );
+				current_place <- my_current_cell.my_mnt_cell; 
+				//is the current vole agent a long disperser?
 				crazy_voles <- flip(crazy_vole_rate);
 			}
 				
@@ -420,20 +397,22 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 	}
 	
 }
-
+/**
+ * starting place of the population spread
+ */
 species plots
 {
-		
 	aspect default
 	{
 		draw shape color:#red;
 	}
 }
 
-
-
+/* experiment to play */
 experiment campagnols type: gui {
-	/** Insert here the definition of the input and output of the model */
+	/**
+	 * parameters
+	 */
 	parameter "simnum" var: simnum <- 0 ;
 	parameter "younger_compartment_change_rate" var: younger_compartment_max_age <- 18#day ;
 	parameter "juvenile_compartment_change_rate" var:juvenile_compartment_max_age<- (8*7)#day ;
@@ -448,10 +427,10 @@ experiment campagnols type: gui {
 	parameter "close_season" var:close_season <- 10;
 	parameter "min_distance_crazy_vole" var:min_distance_crazy_vole <- 100#m;
 	parameter "max_distance_crazy_vole" var:max_distance_crazy_vole <- 3000#m;
-	
-	
-	
-	
+
+/**
+ * outputs of the model
+ */	
 	output {
 		monitor "discovered_area_year" value:discovered_area_year;
 		monitor "densite_monitor" value:densite_monitor;
@@ -462,15 +441,9 @@ experiment campagnols type: gui {
 		monitor "max_cell_population" value:max_cell_population;
 		monitor "long_distance_dispersing_voles" value:long_distance_dispersing_voles;
 		monitor "short_distance_dispersing_voles" value:short_distance_dispersing_voles;
-//		monitor "min_cell_younger_monitor" value:min_cell_younger_monitor;
-//		monitor "min_cell_juvenile_monitor" value:min_cell_juvenile_monitor;
-//		monitor "min_cell_adult_monitor" value:min_cell_adult_monitor;
-//		monitor "max_cell_younger_monitor" value:max_cell_younger_monitor;
-//		monitor "max_cell_juvenile_monitor" value:max_cell_juvenile_monitor;
-//		monitor "max_cell_adult_monitor" value:max_cell_adult_monitor;
 		monitor "current_date" value:""+current_date.year+"-"+current_date.month+"-"+current_date.day;
 		monitor "discovered_area" value:discovered_area;
-	
+
 		display campagnols_map 
 		{
 			species plots aspect:default;
@@ -480,7 +453,7 @@ experiment campagnols type: gui {
 
 		}
 		
-	/*	display campagnols_population
+		display campagnols_population
 		{
 			chart "Species evolution" type: series  {
 				data "younger" value: sum(cells collect(each.younger_accumulator)) color: #blue ;
@@ -499,8 +472,5 @@ experiment campagnols type: gui {
 				data "adult" value: pop_adult/pop_total * 100  color: #red ;
 			}
 		}
- */
-		
-		
 	}
 }
