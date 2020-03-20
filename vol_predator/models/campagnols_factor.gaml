@@ -286,7 +286,7 @@ species zone_information schedules:[]
 	{
 		return 0;
 	}
-	
+	 
 }
 // model predators of the system. this species should be inherited to derive specific predators (generalist, specialist ...)
 species death_factor
