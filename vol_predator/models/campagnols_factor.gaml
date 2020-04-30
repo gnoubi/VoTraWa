@@ -30,14 +30,16 @@ global {
 	float young_weight <- 40#gram;
 	float juvenile_weight <- 80#gram;
 	float adult_weight <- 80#gram;
-	float qt_female_to_eat <- /*30*/ (5 * (80#gram))/(#km*#km);
+	// entre 2 et 11 kg par KM2/J
+	
+	float qt_female_to_eat <- 500#kilo/(#km*#km)/#day;    ////*30*/ (5 * (80#gram))/(#km*#km);
 	//float vole_eat_qte <-30;
 	//float vole_eat_surfacique_mass <- vole_eat_qte*80#gram/(100#m*100#m);
 	float adult_eat_proportion <- 1.0;//0.5;
 	float juvenile_eat_proportion <- 0.0;//0.5;
 	float young_eat_proportion <- 1 - adult_eat_proportion - juvenile_eat_proportion;
 
-	float buffer_size <- 20#m;
+	float buffer_size <- 200#m;
 
 
 
@@ -195,7 +197,7 @@ global {
 		
 		ask death_factor{
 			do update_boundaries;
-			qt_vole_to_eat <- (length(knowledge.keys)*first(knowledge.keys).shape.area)* qt_female_to_eat;
+			qt_vole_to_eat <-1#gram ; //500#kilo; //(length(knowledge.keys)*first(knowledge.keys).shape.area)* qt_female_to_eat; //100#gram;//
 			write "superficie qte "+ qt_female_to_eat;
 			write "superficie surf  "+ (length(knowledge.keys)*first(knowledge.keys).shape.area);
 			write "superficie "+ ((length(knowledge.keys)*first(knowledge.keys).shape.area))+ " " + qt_vole_to_eat;
@@ -268,7 +270,7 @@ species zone_information schedules:[]
 	float number_of_juvenile;
 	float number_of_adult;
 	float number_of_voles -> {number_of_young + number_of_juvenile + number_of_adult };
-	
+	int last_update_cycle <- -1;
 	cells associated_cell;
 	
 	bool is_boundary <- true;
@@ -280,11 +282,20 @@ species zone_information schedules:[]
 		number_of_young <- associated_cell.younger_accumulator;
 		number_of_juvenile <- associated_cell.juvenile_accumulator;
 		number_of_adult <- associated_cell.adult_accumulator;
+		last_update_cycle <- cycle;
 	}
 	
 	float evaluate 
 	{
 		return 0;
+	}
+	
+	aspect base
+	{
+		if(cycle-1 = last_update_cycle)
+		{
+			draw associated_cell.shape color:#blue;
+		}
 	}
 	 
 }
@@ -301,18 +312,18 @@ species death_factor
 	
 	//proportion de chaque quan
 	
-	int travel_to_eat_size <- 100000;
+	int travel_to_eat_size <- 10; //0000;
 //	float population;
 	map<cells,zone_information> knowledge <- [];	
 	rgb my_color ;
 	
 	geometry my_research_area <- location;
 	
-	reflex reduce_zone when:false
+	reflex reduce_zone when:true
 	{
 		list<zone_information> to_forget <- knowledge.values where(each.date_to_forget<=current_date and each.is_boundary = true  );
 		
-		//rechercher les nouvelles cellules boundaries dans les boundaries...
+		// rechercher les nouvelles cellules boundaries dans les boundaries...
 		
 		list<zone_information> to_forget_ordered <- knowledge.values sort_by (each.date_to_forget);
 		write "to remove "+ length(to_forget)+" "+ current_date +" "+first(to_forget_ordered).date_to_forget;	
@@ -361,10 +372,14 @@ species death_factor
 		int nb_cell_moved_start <-length(sorted_cells);
 		float t_to_eat <- qt_vole_to_eat;
 		
-		loop while:t_to_eat > 0 and nb_cell_moved < nb_cell_moved_start
-		{
-			list<zone_information> first_elements <- copy_between(sorted_cells,0,travel_to_eat_size);
+		//loop while:t_to_eat > 0 and nb_cell_moved < nb_cell_moved_start
+		//{
+			int knowledge_size <- length(sorted_cells);
+			list<zone_information> first_elements <- copy_between(sorted_cells,knowledge_size-travel_to_eat_size,knowledge_size);
 			// ils mangent dans les n premières cellules au prorata du nombre de campagnols dans chaque cellule
+			
+			write "taille elements " + knowledge_size+" " +length(first_elements);
+			write "data "+ first_elements collect(each.associated_cell.total_mass);
 			float available_meat <- sum(first_elements collect(each.associated_cell.total_mass));
 			list<float> killed <- [0.0,0.0,0.0];
 			list<float> local_killed <- [0.0,0.0,0.0];
@@ -376,16 +391,15 @@ species death_factor
 					float to_eat  <- t_to_eat * (self.associated_cell.total_mass/available_meat);
 					ask self.associated_cell {
 						//correction --- parler en individus
-						if(available_meat > to_eat)
-						{
-							
+					//	if(available_meat > to_eat)
+					//	{
 							local_killed <- kill(to_eat*adult_eat_proportion,to_eat*juvenile_eat_proportion, to_eat*young_eat_proportion);
-						}	
-						else
-						{
-							local_killed <-  kill_all(adult_eat_proportion!=0.0, juvenile_eat_proportion!=0.0,young_eat_proportion!=0.0);
-						}
-						t_to_eat <- t_to_eat - sum(local_killed);
+					//	}	
+					//	else
+					//	{
+					//		local_killed <-  kill_all(adult_eat_proportion!=0.0, juvenile_eat_proportion!=0.0,young_eat_proportion!=0.0);
+					//	}
+						//t_to_eat <- t_to_eat - sum(local_killed);
 					}
 					// S'il n'a plus assez a manger dans les n premières cellules (1ere iteration), il doit actualiser sa base de connaissance par une exploration
 					// il va chercher dans d'autres cellules de sa base de connaissances ou actualiser sa base de connaissances.
@@ -394,10 +408,10 @@ species death_factor
 			}
 			remove all:first_elements from: sorted_cells;
 			add all:first_elements to:used_knowledge;
-		}
+		//}
 		
-		write "nb cell " + nb_cell_moved +  " "+ nb_cell_moved_start;
-		write  self.name +" want to eat "+t_to_eat+ "("+qt_vole_to_eat+")";
+//		write "nb cell " + nb_cell_moved +  " "+ nb_cell_moved_start;
+//		write  self.name +" want to eat "+t_to_eat+ "("+qt_vole_to_eat+")";
 			
 	}
 	
@@ -423,6 +437,7 @@ species death_factor
 			}
 		}
 		else {
+			write "add zone ";
 			create zone_information number:1
 			{
 					associated_cell <- my_cell;
@@ -745,10 +760,13 @@ grid cells cell_width:100#m cell_height:100#m schedules:  simulated_plots
 		float next_step_younger_accumulator <- temp_repo*step * (adult_accumulator + juvenile_sum) *(1-total_population/carring_capacity);
 		if (adult_accumulator !=0)
 		{
+//			add next_step_younger_accumulator to:young_born_day_acc;
 			young_born_day_acc <- young_born_day_acc + next_step_younger_accumulator;
-						
 		}
-		
+		else
+		{
+			young_born_day_acc <- young_born_day_acc + next_step_younger_accumulator;
+		}
 		/**
 		 * Substract adult, juvenile and younger dead voles from the population
 		 */		
@@ -824,7 +842,7 @@ experiment campagnols type: gui {
 	parameter "close_season" var:close_season <- 10;
 	parameter "min_distance_crazy_vole" var:min_distance_crazy_vole <- 100#m;
 	parameter "max_distance_crazy_vole" var:max_distance_crazy_vole <- 3000#m;
-	parameter "buffer_size" var:buffer_size  <- 200#m;
+	parameter "buffer_size" var:buffer_size  <- 500#m;
 /**
  * outputs of the model
  */	
@@ -849,7 +867,8 @@ experiment campagnols type: gui {
 		display discovering_map
 		{
 			grid cells;
-			species death_factor aspect:discovering_aspect transparency:0.7;
+			species zone_information aspect:base;
+			species death_factor aspect:discovering_aspect transparency:0.5;
 		}
 
 		display campagnols_map 
